@@ -3,7 +3,7 @@ import { CaptionedVideo } from './CaptionedVideo/index.jsx';
 export const TempCaptionedVideo = () => {
   return (
     <CaptionedVideo
-      videoSrc="http://localhost:3000/uploads/video-1759138530964-609848248.mp4"
+      videoSrc="http://localhost:3000/uploads/video-1759156774989-395791484.mp4"
       captions={[
   {
     "index": 1,

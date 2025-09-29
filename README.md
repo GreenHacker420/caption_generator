@@ -2,26 +2,30 @@
 
 A local web application that automatically generates captions for MP4 videos using Whisper.cpp and renders them with Remotion. Supports Hinglish (Hindi + English) text with proper font rendering.
 
-## Features
+## ✨ Features
 
-- **Video Upload**: Drag & drop or browse MP4 files (up to 100MB)
-- **Local Speech-to-Text**: Uses Whisper.cpp for offline caption generation
-- **Hinglish Support**: Proper rendering of Hindi + English mixed text
-- **Multiple Caption Styles**: 
+- 📁 **Video Upload**: Drag & drop or browse MP4 files (up to 100MB)
+- 🎤 **Local Speech-to-Text**: Uses Whisper.cpp for offline caption generation
+- 🌍 **Hinglish Support**: Proper rendering of Hindi + English mixed text
+- 🎨 **Multiple Caption Styles**: 
   - Bottom Centered (classic subtitles)
   - Top Bar (news-style overlay)
   - Karaoke Style (colorful gradient text)
-- **Real-time Preview**: See captions overlaid on video
-- **Video Export**: Render final video with captions using Remotion
-- **SRT Export**: Download caption files in SRT format
+- 👁️ **Real-time Preview**: See captions overlaid on video
+- 🎬 **Dual Export Methods**: 
+  - **FFmpeg Rendering** (Primary): Direct subtitle burning for maximum compatibility
+  - **Remotion Rendering** (Fallback): Advanced composition for complex styles
+- 📄 **SRT Export**: Download caption files in SRT format
+- 🔄 **Auto Studio Integration**: Automatically opens Remotion Studio after caption generation
 
 ## Quick Start
 
 ### Prerequisites
 
 - **Node.js** (v18 or higher)
-- **FFmpeg** (for audio extraction)
+- **FFmpeg** (for audio extraction and video rendering)
 - **macOS/Linux** (Whisper.cpp compiled for Unix systems)
+- **Chrome/Chromium** (for Remotion fallback rendering)
 
 ### Installation
 
@@ -46,6 +50,11 @@ A local web application that automatically generates captions for MP4 videos usi
    sudo apt update && sudo apt install ffmpeg
    ```
 
+4. **Verify FFmpeg installation**:
+   ```bash
+   ffmpeg -version  # Should show version info with libx264 and subtitle support
+   ```
+
 ### Running the Application
 
 1. **Start the server**:
@@ -61,9 +70,10 @@ A local web application that automatically generates captions for MP4 videos usi
 3. **Upload and process videos**:
    - Drag & drop an MP4 file or click to browse
    - Click "Generate Captions" to process with Whisper.cpp
+   - **Auto-opens Remotion Studio** for advanced editing (optional)
    - Select a caption style (Bottom, Top Bar, or Karaoke)
    - Preview captions on the video
-   - Export final video with captions
+   - Export final video with captions (uses FFmpeg for reliability)
 
 ## Architecture
 
@@ -131,7 +141,8 @@ caption/
 
 - `POST /api/upload` - Upload video file
 - `POST /api/generate-captions` - Generate captions with Whisper.cpp
-- `POST /api/render-video` - Render video with captions using Remotion
+- `POST /api/open-studio` - Open Remotion Studio with captions
+- `POST /api/render-video` - Render video with captions (FFmpeg primary, Remotion fallback)
 
 ## Caption Styles
 
@@ -151,7 +162,7 @@ Uses Google Fonts:
 - **Noto Sans**: For English characters
 - **Automatic fallback**: Seamless mixed-language rendering
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
@@ -170,6 +181,23 @@ Uses Google Fonts:
    ```bash
    chmod +x whisper.cpp/build/bin/whisper-cli
    ```
+
+4. **Video export fails**:
+   - **Primary Solution**: Uses FFmpeg for direct subtitle burning (most reliable)
+   - **Fallback**: Remotion rendering if FFmpeg fails
+   - **Check**: Ensure FFmpeg has subtitle support: `ffmpeg -filters | grep subtitle`
+
+5. **Large files in Git**:
+   ```bash
+   # Remove large video files from Git
+   git rm --cached uploads/*.mp4 outputs/*.mp4
+   git commit -m "Remove large video files"
+   ```
+
+6. **Remotion PIPELINE_ERROR_DECODE**:
+   - **Fixed**: Now uses FFmpeg as primary rendering method
+   - **Cause**: Video codec compatibility issues with Chromium
+   - **Solution**: FFmpeg directly burns subtitles into video
 
 ### Performance Tips
 

@@ -104,6 +104,94 @@ app.post('/api/generate-captions', async (req, res) => {
   }
 });
 
+// Helper function to create SRT file from captions
+const createSRTFile = async (captions, outputPath) => {
+  const srtContent = captions.map(caption => {
+    const startTime = secondsToSRTTime(caption.startTime);
+    const endTime = secondsToSRTTime(caption.endTime);
+    
+    return `${caption.index}\n${startTime} --> ${endTime}\n${caption.text}\n`;
+  }).join('\n');
+  
+  await fs.writeFile(outputPath, srtContent, 'utf8');
+  console.log(`📄 SRT file created: ${outputPath}`);
+};
+
+// Helper function to convert seconds to SRT time format
+const secondsToSRTTime = (seconds) => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+};
+
+// Helper function to render video with FFmpeg subtitle burning
+const renderVideoWithFFmpeg = (inputPath, srtPath, outputPath, style = 'bottom') => {
+  return new Promise((resolve, reject) => {
+    // Configure subtitle style based on selected style
+    let subtitleFilter;
+    
+    switch (style) {
+      case 'top':
+        subtitleFilter = `subtitles=${srtPath}:force_style='Fontname=Noto Sans Devanagari,FontSize=24,PrimaryColour=&Hffffff,BackColour=&H80000000,Bold=1,Alignment=8'`;
+        break;
+      case 'karaoke':
+        subtitleFilter = `subtitles=${srtPath}:force_style='Fontname=Noto Sans Devanagari,FontSize=28,PrimaryColour=&Hff6b6b,SecondaryColour=&H4ecdc4,Bold=1,Alignment=2'`;
+        break;
+      case 'bottom':
+      default:
+        subtitleFilter = `subtitles=${srtPath}:force_style='Fontname=Noto Sans Devanagari,FontSize=26,PrimaryColour=&Hffffff,OutlineColour=&H000000,BackColour=&H80000000,Bold=1,Outline=2,Shadow=1,Alignment=2'`;
+        break;
+    }
+    
+    const ffmpeg = spawn('ffmpeg', [
+      '-i', inputPath,
+      '-vf', subtitleFilter,
+      '-c:v', 'libx264',
+      '-preset', 'medium',
+      '-crf', '23',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-y',
+      outputPath
+    ]);
+
+    let stderr = '';
+    
+    ffmpeg.stderr.on('data', (data) => {
+      const output = data.toString();
+      stderr += output;
+      
+      // Log progress
+      if (output.includes('time=')) {
+        const timeMatch = output.match(/time=(\d{2}:\d{2}:\d{2}\.\d{2})/);
+        if (timeMatch) {
+          console.log(`🎬 Rendering progress: ${timeMatch[1]}`);
+        }
+      }
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        console.log('✅ FFmpeg subtitle rendering completed');
+        resolve();
+      } else {
+        console.error('❌ FFmpeg rendering failed with code:', code);
+        console.error('FFmpeg stderr:', stderr);
+        reject(new Error(`FFmpeg rendering failed with code ${code}`));
+      }
+    });
+
+    ffmpeg.on('error', (error) => {
+      console.error('FFmpeg process error:', error);
+      reject(new Error(`Failed to start FFmpeg: ${error.message}`));
+    });
+  });
+};
+
 // Helper function to convert video to Remotion-compatible format
 const convertVideoForRemotion = (inputPath) => {
   return new Promise((resolve, reject) => {
@@ -296,7 +384,7 @@ export const TempCaptionedVideo = () => {
   }
 });
 
-// Render video with captions using Remotion
+// Render video with captions using FFmpeg (more reliable than Remotion for problematic videos)
 app.post('/api/render-video', async (req, res) => {
   try {
     const { videoPath, captions, style } = req.body;
@@ -308,51 +396,65 @@ app.post('/api/render-video', async (req, res) => {
     const outputPath = path.join(__dirname, 'outputs', `captioned-${Date.now()}.mp4`);
     const originalVideoPath = path.join(__dirname, videoPath);
     
-    let compatibleVideoPath;
-    let videoUrl;
+    // Create SRT file from captions
+    const srtPath = path.join(__dirname, 'uploads', `temp-captions-${Date.now()}.srt`);
+    await createSRTFile(captions, srtPath);
+    
+    console.log('🎬 Starting video rendering with FFmpeg...');
     
     try {
-      // Try to convert video to compatible format for Remotion
-      console.log('Converting video to compatible format...');
-      compatibleVideoPath = await convertVideoForRemotion(originalVideoPath);
-      videoUrl = `http://localhost:3000${compatibleVideoPath.replace(__dirname, '')}`;
-      console.log('Video conversion successful');
-    } catch (conversionError) {
-      console.warn('Video conversion failed, using original video:', conversionError.message);
-      // Fallback to original video
-      videoUrl = `http://localhost:3000${videoPath.startsWith('/') ? videoPath : `/${videoPath}`}`;
+      // Use FFmpeg to burn subtitles directly into video (more reliable)
+      await renderVideoWithFFmpeg(originalVideoPath, srtPath, outputPath, style);
+      console.log('✅ Video rendering completed successfully');
+      
+      // Clean up temporary SRT file
+      await fs.remove(srtPath);
+      
+      const outputUrl = `/outputs/${path.basename(outputPath)}`;
+      res.json({ 
+        success: true, 
+        outputPath: outputUrl,
+        message: 'Video rendered successfully with captions using FFmpeg'
+      });
+    } catch (ffmpegError) {
+      console.warn('FFmpeg rendering failed, trying Remotion fallback:', ffmpegError.message);
+      
+      // Fallback to Remotion if FFmpeg fails
+      try {
+        const compatibleVideoPath = await convertVideoForRemotion(originalVideoPath);
+        const videoUrl = `http://localhost:3000${compatibleVideoPath.replace(__dirname, '')}`;
+        
+        const lastCaption = captions[captions.length - 1];
+        const videoDuration = lastCaption ? Math.ceil(lastCaption.endTime) : 60;
+        const durationInFrames = videoDuration * 30;
+
+        const propsFile = path.join(__dirname, 'temp-props.json');
+        const props = {
+          videoSrc: videoUrl,
+          captions: captions,
+          style: style || 'bottom'
+        };
+        
+        await fs.writeFile(propsFile, JSON.stringify(props, null, 2));
+        await renderVideoWithRemotion(outputPath, durationInFrames, propsFile);
+        
+        // Clean up temporary files
+        await fs.remove(propsFile);
+        await fs.remove(compatibleVideoPath);
+        await fs.remove(srtPath);
+
+        const outputUrl = `/outputs/${path.basename(outputPath)}`;
+        res.json({ 
+          success: true, 
+          outputPath: outputUrl,
+          message: 'Video rendered successfully with captions using Remotion fallback'
+        });
+      } catch (remotionError) {
+        console.error('Both FFmpeg and Remotion failed:', remotionError.message);
+        await fs.remove(srtPath);
+        throw new Error(`Video rendering failed: ${ffmpegError.message}. Remotion fallback also failed: ${remotionError.message}`);
+      }
     }
-    
-    // Calculate video duration from captions
-    const lastCaption = captions[captions.length - 1];
-    const videoDuration = lastCaption ? Math.ceil(lastCaption.endTime) : 60;
-    const durationInFrames = videoDuration * 30; // 30 fps
-
-    // Create temporary props file for Remotion
-    const propsFile = path.join(__dirname, 'temp-props.json');
-    const props = {
-      videoSrc: videoUrl,
-      captions: captions,
-      style: style || 'bottom'
-    };
-    
-    await fs.writeFile(propsFile, JSON.stringify(props, null, 2));
-
-    // Render video using Remotion CLI with error handling
-    await renderVideoWithRemotion(outputPath, durationInFrames, propsFile);
-    
-    // Clean up temporary files
-    await fs.remove(propsFile);
-    if (compatibleVideoPath) {
-      await fs.remove(compatibleVideoPath);
-    }
-
-    const outputUrl = `/outputs/${path.basename(outputPath)}`;
-    res.json({ 
-      success: true, 
-      outputPath: outputUrl,
-      message: 'Video rendered successfully with captions'
-    });
   } catch (error) {
     console.error('Render error:', error);
     res.status(500).json({ error: 'Failed to render video: ' + error.message });
