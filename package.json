@@ -5,14 +5,22 @@
   "repository": {},
   "license": "UNLICENSED",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@remotion/cli": "4.0.354",
+    "@remotion/player": "4.0.354",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "remotion": "4.0.354",
     "zod": "3.22.3",
     "@remotion/tailwind-v4": "4.0.354",
-    "tailwindcss": "4.0.0"
+    "tailwindcss": "4.1.13",
+    "express": "^4.18.2",
+    "multer": "^2.0.2",
+    "cors": "^2.8.5",
+    "child_process": "^1.0.2",
+    "fs-extra": "^11.3.2",
+    "path": "^0.12.7"
   },
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.354",
@@ -21,6 +29,8 @@
   },
   "scripts": {
     "dev": "remotion studio",
+    "start": "node server.js",
+    "app": "node server.js",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src"
