@@ -12,11 +12,9 @@ A local web application that automatically generates captions for MP4 videos usi
   - Top Bar (news-style overlay)
   - Karaoke Style (colorful gradient text)
 - 👁️ **Real-time Preview**: See captions overlaid on video
-- 🎬 **Dual Export Methods**: 
-  - **FFmpeg Rendering** (Primary): Direct subtitle burning for maximum compatibility
-  - **Remotion Rendering** (Fallback): Advanced composition for complex styles
+- 🎬 **FFmpeg Video Rendering**: Direct subtitle burning for maximum compatibility
 - 📄 **SRT Export**: Download caption files in SRT format
-- 🔄 **Auto Studio Integration**: Automatically opens Remotion Studio after caption generation
+- ⚡ **Functional Components**: Clean, modular vanilla JavaScript architecture
 
 ## Quick Start
 
@@ -25,7 +23,6 @@ A local web application that automatically generates captions for MP4 videos usi
 - **Node.js** (v18 or higher)
 - **FFmpeg** (for audio extraction and video rendering)
 - **macOS/Linux** (Whisper.cpp compiled for Unix systems)
-- **Chrome/Chromium** (for Remotion fallback rendering)
 
 ### Installation
 
@@ -70,31 +67,33 @@ A local web application that automatically generates captions for MP4 videos usi
 3. **Upload and process videos**:
    - Drag & drop an MP4 file or click to browse
    - Click "Generate Captions" to process with Whisper.cpp
-   - **Auto-opens Remotion Studio** for advanced editing (optional)
    - Select a caption style (Bottom, Top Bar, or Karaoke)
    - Preview captions on the video
    - Export final video with captions (uses FFmpeg for reliability)
 
 ## Architecture
 
-### Component-Based ES6 Structure
+### Functional Component Architecture
 
-- **VideoUploader**: Handles file upload with drag & drop
+- **VideoUploader**: Handles file upload with drag & drop using IIFE pattern
 - **VideoPreview**: Displays video with caption overlay
 - **CaptionGenerator**: Integrates with Whisper.cpp for STT
 - **StatusManager**: User feedback and notifications
+- **AppState**: Centralized state management
 
 ### Backend Integration
 
 - **Express Server**: Unified frontend/backend in single app
 - **Whisper.cpp Integration**: Local speech-to-text processing
-- **Remotion Rendering**: Video composition with captions
+- **FFmpeg Rendering**: Direct subtitle burning for video export
 - **File Management**: Upload/output handling
 
-### Remotion Components
+### Key Improvements
 
-- **CaptionedVideo**: Main composition for video + captions
-- **CaptionOverlay**: Styled caption rendering with Hinglish support
+- **No React Dependencies**: Pure vanilla JavaScript with functional patterns
+- **Modular Design**: Each component is self-contained with clear interfaces
+- **Simplified Architecture**: Removed Remotion complexity, using FFmpeg directly
+- **Better Performance**: Lighter weight without React/Remotion overhead
 
 ## Usage Examples
 

@@ -327,62 +327,7 @@ const srtTimeToSeconds = (timeStr) => {
   return hours * 3600 + minutes * 60 + seconds + (ms ? parseInt(ms) / 1000 : 0);
 };
 
-// Open Remotion studio with captions
-app.post('/api/open-studio', async (req, res) => {
-  try {
-    const { videoPath, captions, style } = req.body;
-    
-    if (!videoPath || !captions) {
-      return res.status(400).json({ error: 'Video path and captions are required' });
-    }
-
-    // Create a temporary composition with the captions
-    const tempCompositionPath = path.join(__dirname, 'src', 'TempCaptionedVideo.jsx');
-    // Use full URL path for Remotion to access the video
-    const videoUrl = `http://localhost:3000${videoPath.startsWith('/') ? videoPath : `/${videoPath}`}`;
-    
-    // Calculate video duration from captions
-    const lastCaption = captions[captions.length - 1];
-    const videoDuration = lastCaption ? Math.ceil(lastCaption.endTime) : 60;
-    const durationInFrames = videoDuration * 30; // 30 fps
-
-    // Create temporary composition file
-    const compositionContent = `import { CaptionedVideo } from './CaptionedVideo/index.jsx';
-
-export const TempCaptionedVideo = () => {
-  return (
-    <CaptionedVideo
-      videoSrc="${videoUrl}"
-      captions={${JSON.stringify(captions, null, 2)}}
-      style="${style || 'bottom'}"
-    />
-  );
-};`;
-
-    await fs.writeFile(tempCompositionPath, compositionContent);
-
-    // Update Root.jsx to include the temporary composition
-    await updateRootWithTempComposition(durationInFrames, captions, style, videoUrl);
-
-    // Open Remotion studio
-    const studioProcess = spawn('npm', ['run', 'dev'], {
-      cwd: __dirname,
-      detached: true,
-      stdio: 'ignore'
-    });
-
-    studioProcess.unref();
-
-    res.json({ 
-      success: true, 
-      message: 'Remotion studio opening with your captions...',
-      studioUrl: 'http://localhost:3001'
-    });
-  } catch (error) {
-    console.error('Studio open error:', error);
-    res.status(500).json({ error: 'Failed to open studio: ' + error.message });
-  }
-});
+// Removed Remotion studio functionality - using FFmpeg for video rendering
 
 // Render video with captions using FFmpeg (more reliable than Remotion for problematic videos)
 app.post('/api/render-video', async (req, res) => {
@@ -524,43 +469,6 @@ const renderVideoWithRemotion = (outputPath, durationInFrames, propsFile) => {
       reject(new Error(`Failed to start video rendering: ${error.message}`));
     });
   });
-};
-
-// Helper function to update Root.jsx with temporary composition
-const updateRootWithTempComposition = async (durationInFrames, captions, style, videoPath) => {
-  const rootPath = path.join(__dirname, 'src', 'Root.jsx');
-  const rootContent = await fs.readFile(rootPath, 'utf8');
-  
-  // Check if TempCaptionedVideo import already exists
-  if (!rootContent.includes('TempCaptionedVideo')) {
-    // Add import
-    const updatedContent = rootContent.replace(
-      'import { CaptionedVideo } from "./CaptionedVideo/index.jsx";',
-      `import { CaptionedVideo } from "./CaptionedVideo/index.jsx";
-        import { TempCaptionedVideo } from "./TempCaptionedVideo.jsx";`
-    );
-    
-    // Add composition before the closing tags
-    const finalContent = updatedContent.replace(
-      '    </>',
-      `      <Composition
-        id="TempCaptionedVideo"
-        component={TempCaptionedVideo}
-        durationInFrames={${durationInFrames}}
-        fps={30}
-        width={1920}
-        height={1080}
-        defaultProps={{
-          videoSrc: "${videoPath}",
-          captions: ${JSON.stringify(captions, null, 10)},
-          style: "${style || 'bottom'}"
-        }}
-      />
-    </>`
-    );
-    
-    await fs.writeFile(rootPath, finalContent);
-  }
 };
 
 app.listen(PORT, () => {
