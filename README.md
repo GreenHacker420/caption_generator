@@ -121,10 +121,13 @@ caption/
 ├── server.js              # Main Express server
 ├── public/
 │   ├── index.html         # Web interface
-│   └── app.js            # Frontend components
-├── src/
-│   ├── Root.jsx          # Remotion compositions
-│   └── CaptionedVideo/   # Caption rendering components
+│   └── js/               # Modular components
+│       ├── app.js        # Main app & state management
+│       ├── uploader.js   # Video upload component
+│       ├── preview.js    # Video preview component
+│       ├── captions.js   # Caption generation & export
+│       ├── status.js     # Status notifications
+│       └── progress.js   # Progress bar utilities
 ├── whisper.cpp/          # Local Whisper.cpp installation
 ├── uploads/              # Uploaded videos
 └── outputs/              # Rendered videos
@@ -133,15 +136,25 @@ caption/
 ### Available Scripts
 
 - `npm run app` - Start the web application
-- `npm run dev` - Start Remotion studio for development
-- `npm run build` - Build Remotion bundle
+- `npm run start` - Start the web application
+- `npm run dev` - Start the web application (development)
 
 ### API Endpoints
 
 - `POST /api/upload` - Upload video file
 - `POST /api/generate-captions` - Generate captions with Whisper.cpp
-- `POST /api/open-studio` - Open Remotion Studio with captions
-- `POST /api/render-video` - Render video with captions (FFmpeg primary, Remotion fallback)
+- `POST /api/render-video` - Render video with captions using FFmpeg
+
+### Component Architecture
+
+Each component is a self-contained ES6 module using the IIFE pattern:
+
+- **app.js**: Central state management and application initialization
+- **uploader.js**: File upload with drag & drop, validation, and progress
+- **preview.js**: Video display and caption overlay functionality  
+- **captions.js**: Whisper.cpp integration, style selection, and export
+- **status.js**: User notification system with different message types
+- **progress.js**: Reusable progress bar utilities and animations
 
 ## Caption Styles
 

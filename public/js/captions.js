@@ -1,176 +1,6 @@
-const AppState = {
-    currentVideo: null,
-    currentCaptions: [],
-    currentStyle: 'bottom',
-    
-    setVideo(video) {
-        this.currentVideo = video;
-    },
-    
-    setCaptions(captions) {
-        this.currentCaptions = captions;
-    },
-    
-    setStyle(style) {
-        this.currentStyle = style;
-    }
-};
-
-const VideoUploader = (() => {
-    let elements = {};
-    
-    const init = () => {
-        elements = {
-            uploadZone: document.getElementById('uploadZone'),
-            videoInput: document.getElementById('videoInput'),
-            uploadProgress: document.getElementById('uploadProgress'),
-            progressBar: document.getElementById('progressBar'),
-            progressText: document.getElementById('progressText')
-        };
-        
-        setupEventListeners();
-    };
-    
-    const setupEventListeners = () => {
-        elements.uploadZone.addEventListener('click', () => {
-            elements.videoInput.click();
-        });
-
-        elements.videoInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFileUpload(e.target.files[0]);
-            }
-        });
-        
-
-        elements.uploadZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            elements.uploadZone.classList.add('dragover');
-        });
-        
-        elements.uploadZone.addEventListener('dragleave', () => {
-            elements.uploadZone.classList.remove('dragover');
-        });
-        
-        elements.uploadZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            elements.uploadZone.classList.remove('dragover');
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0 && files[0].type.startsWith('video/')) {
-                handleFileUpload(files[0]);
-            }
-        });
-    };
-    
-    const handleFileUpload = async (file) => {
-        if (!validateFile(file)) return;
-        
-        showProgress();
-        
-        const formData = new FormData();
-        formData.append('video', file);
-        
-        try {
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                AppState.setVideo(result.video);
-                hideProgress();
-                VideoPreview.show(result.video);
-                StatusManager.showSuccess('Video uploaded successfully!');
-            } else {
-                throw new Error(result.error || 'Upload failed');
-            }
-        } catch (error) {
-            console.error('Upload error:', error);
-            hideProgress();
-            StatusManager.showError('Failed to upload video: ' + error.message);
-        }
-    };
-    
-    const validateFile = (file) => {
-        if (!file.type.startsWith('video/')) {
-            StatusManager.showError('Please select a valid video file');
-            return false;
-        }
-        
-        if (file.size > 100 * 1024 * 1024) {
-            StatusManager.showError('File size must be less than 100MB');
-            return false;
-        }
-        
-        return true;
-    };
-    
-    const showProgress = () => {
-        elements.uploadProgress.classList.remove('hidden');
-        simulateProgress();
-    };
-    
-    const simulateProgress = () => {
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress >= 95) {
-                progress = 95;
-                clearInterval(interval);
-            }
-            elements.progressBar.style.width = progress + '%';
-            elements.progressText.textContent = `Uploading... ${Math.round(progress)}%`;
-        }, 200);
-    };
-    
-    const hideProgress = () => {
-        elements.uploadProgress.classList.add('hidden');
-        elements.progressBar.style.width = '0%';
-    };
-    
-    return {
-        init,
-        getCurrentVideo: () => AppState.currentVideo
-    };
-})();
-
-const VideoPreview = (() => {
-    const show = (videoInfo) => {
-        const videoSection = document.getElementById('videoSection');
-        const videoPreview = document.getElementById('videoPreview');
-        
-        videoPreview.src = videoInfo.url;
-        videoSection.classList.remove('hidden');
-        
-        const generateBtn = document.getElementById('generateCaptions');
-        generateBtn.onclick = () => CaptionGenerator.generate(videoInfo);
-    };
-    
-    const showCaptionOverlay = (text, style = 'bottom') => {
-        const overlay = document.getElementById('captionOverlay');
-        overlay.textContent = text;
-        overlay.className = `caption-preview caption-${style} hinglish-text`;
-        overlay.classList.remove('hidden');
-    };
-    
-    const hideCaptionOverlay = () => {
-        const overlay = document.getElementById('captionOverlay');
-        overlay.classList.add('hidden');
-    };
-    
-    return {
-        show,
-        showCaptionOverlay,
-        hideCaptionOverlay
-    };
-})();
-
-
-const CaptionGenerator = (() => {
+export const CaptionGenerator = (() => {
     const generate = async (videoInfo) => {
+        const { StatusManager } = await import('./status.js');
         StatusManager.showStatus('Generating captions with Whisper.cpp...');
         
         try {
@@ -187,6 +17,7 @@ const CaptionGenerator = (() => {
             const result = await response.json();
             
             if (result.success) {
+                const { AppState } = await import('./app.js');
                 AppState.setCaptions(result.captions);
                 showControls();
                 displayCaptions();
@@ -196,6 +27,7 @@ const CaptionGenerator = (() => {
             }
         } catch (error) {
             console.error('Caption generation error:', error);
+            const { StatusManager } = await import('./status.js');
             StatusManager.showError('Failed to generate captions: ' + error.message);
         }
     };
@@ -207,23 +39,25 @@ const CaptionGenerator = (() => {
         captionSection.classList.remove('hidden');
         previewBtn.classList.remove('hidden');
         
-        // Initialize style selection
         initializeStyleSelection();
-        
-        // Initialize buttons
+
         previewBtn.onclick = () => previewCaptions();
         document.getElementById('exportVideo').onclick = () => exportVideo();
         document.getElementById('exportSRT').onclick = () => exportSRT();
     };
     
-    const initializeStyleSelection = () => {
+    const initializeStyleSelection = async () => {
         const styleOptions = document.querySelectorAll('.caption-style-option');
         
         styleOptions.forEach(option => {
-            option.addEventListener('click', () => {
+            option.addEventListener('click', async () => {
                 styleOptions.forEach(opt => opt.classList.remove('border-blue-500', 'bg-blue-50'));
+                
                 option.classList.add('border-blue-500', 'bg-blue-50');
+                
+                const { AppState } = await import('./app.js');
                 AppState.setStyle(option.dataset.style);
+                
                 const overlay = document.getElementById('captionOverlay');
                 if (!overlay.classList.contains('hidden')) {
                     previewCaptions();
@@ -236,7 +70,8 @@ const CaptionGenerator = (() => {
         }
     };
     
-    const displayCaptions = () => {
+    const displayCaptions = async () => {
+        const { AppState } = await import('./app.js');
         const captionList = document.getElementById('captionList');
         
         if (AppState.currentCaptions.length === 0) {
@@ -263,7 +98,10 @@ const CaptionGenerator = (() => {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
     
-    const previewCaptions = () => {
+    const previewCaptions = async () => {
+        const { AppState } = await import('./app.js');
+        const { VideoPreview } = await import('./preview.js');
+        
         if (AppState.currentCaptions.length === 0) return;
         
         const video = document.getElementById('videoPreview');
@@ -290,6 +128,9 @@ const CaptionGenerator = (() => {
     };
     
     const exportVideo = async () => {
+        const { StatusManager } = await import('./status.js');
+        const { AppState } = await import('./app.js');
+        
         StatusManager.showStatus('🎬 Rendering video with captions...');
         
         try {
@@ -337,14 +178,13 @@ const CaptionGenerator = (() => {
     const addDownloadLink = (outputPath) => {
         const captionSection = document.getElementById('captionSection');
         
-        // Check if download link already exists
         if (document.getElementById('downloadLink')) return;
         
         const downloadDiv = document.createElement('div');
         downloadDiv.id = 'downloadLink';
         downloadDiv.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
         downloadDiv.innerHTML = `
-            <h4 class="font-medium text-green-800 mb-2">🎉 Video Ready!</h4>
+            <h4 class="font-medium text-green-800 mb-2">Video Ready!</h4>
             <a href="${outputPath}" download class="inline-flex items-center bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
                 Download Captioned Video
             </a>
@@ -356,7 +196,10 @@ const CaptionGenerator = (() => {
         }
     };
     
-    const exportSRT = () => {
+    const exportSRT = async () => {
+        const { StatusManager } = await import('./status.js');
+        const { AppState } = await import('./app.js');
+        
         if (AppState.currentCaptions.length === 0) {
             StatusManager.showError('No captions to export');
             return;
@@ -401,62 +244,3 @@ const CaptionGenerator = (() => {
         exportSRT
     };
 })();
-const StatusManager = (() => {
-    const showMessage = (message, type, duration = 3000) => {
-        const statusMessage = document.getElementById('statusMessage');
-        const statusText = document.getElementById('statusText');
-        
-        if (!statusMessage || !statusText) return;
-        
-        const colors = {
-            info: 'bg-blue-600',
-            success: 'bg-green-600',
-            error: 'bg-red-600'
-        };
-        
-        statusText.textContent = message;
-        statusMessage.className = `fixed bottom-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg`;
-        statusMessage.classList.remove('hidden');
-        
-        setTimeout(() => {
-            statusMessage.classList.add('hidden');
-        }, duration);
-    };
-    
-    const showStatus = (message) => {
-        showMessage(message, 'info');
-    };
-    
-    const showSuccess = (message) => {
-        showMessage(message, 'success');
-    };
-    
-    const showError = (message) => {
-        showMessage(message, 'error', 5000);
-    };
-    
-    return {
-        showStatus,
-        showSuccess,
-        showError
-    };
-})();
-
-const App = (() => {
-    const init = () => {
-        VideoUploader.init();
-        
-        console.log('🚀 Video Caption Generator initialized');
-        console.log('📱 Functional component architecture loaded');
-        console.log('🎤 Whisper.cpp integration ready');
-        console.log('🚫 Remotion Studio integration removed');
-    };
-    
-    return {
-        init
-    };
-})();
-
-document.addEventListener('DOMContentLoaded', () => {
-    App.init();
-});
