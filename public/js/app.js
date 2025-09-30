@@ -1,6 +1,3 @@
-// Video Caption Generator - Main Application Module
-
-// Global state management
 export const AppState = {
     currentVideo: null,
     currentCaptions: [],
@@ -25,19 +22,18 @@ export const AppState = {
     }
 };
 
-// Application Initialization
+
 export const App = (() => {
     const init = async () => {
         try {
-            // Initialize all components
             const { VideoUploader } = await import('./uploader.js');
             VideoUploader.init();
             
-            console.log('🚀 Video Caption Generator initialized');
-            console.log('📱 Modular component architecture loaded');
-            console.log('🎤 Whisper.cpp integration ready');
-            console.log('🚫 Remotion Studio integration removed');
-            console.log('⚡ FFmpeg rendering enabled');
+            console.log('Video Caption Generator initialized');
+            console.log('Modular component architecture loaded');
+            console.log('Whisper.cpp integration ready');
+            console.log('Remotion Studio integration removed');
+            console.log('FFmpeg rendering enabled');
         } catch (error) {
             console.error('Failed to initialize application:', error);
         }
@@ -51,7 +47,6 @@ export const App = (() => {
     };
 })();
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     App.init();
 });
